@@ -30,9 +30,6 @@ It demonstrates end-to-end database design — from **data cleaning and schema c
 - **Relationships:** One-to-many between `Region` and `Sales/Forecast`
 - **Indexes:** On `RegionID` and `Month` for optimized time-series querying
 
-ER diagram and normalization steps are detailed in  
-📄 [`reports/CIS 556 - Database Systems-Report.pdf`](reports/CIS%20556%20-Database%20Systems-Report.pdf)
-
 ---
 
 ## 🧩 SQL Scripts
@@ -54,4 +51,5 @@ ORDER BY avg_home_value DESC;
 SELECT region_name,
        (MAX(home_value) - MIN(home_value)) / MIN(home_value) * 100 AS yoy_growth
 FROM market_index
+
 GROUP BY region_name;
