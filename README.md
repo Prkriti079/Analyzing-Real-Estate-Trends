@@ -53,5 +53,3 @@ All datasets used in this project are available in the [`datasets/`](datasets/) 
 #### Folder Structure
 - **`raw/`** → Original Zillow datasets downloaded for analysis.  
 - **`cleaned/`** → Processed, formatted, and normalized datasets ready for database import.  
-
----
