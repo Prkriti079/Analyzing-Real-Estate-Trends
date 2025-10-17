@@ -1,0 +1,7 @@
+# Database Systems Project
+pandas
+numpy
+matplotlib
+seaborn
+sqlalchemy
+psycopg2-binary    # if PostgreSQL

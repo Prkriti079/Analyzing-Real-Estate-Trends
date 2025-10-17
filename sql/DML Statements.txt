@@ -1,0 +1,245 @@
+Indexing
+
+CREATE INDEX idx_zillow_date ON zillow_home_index (date);
+CREATE INDEX idx_growth_basedate ON growth_data (basedate);
+CREATE INDEX idx_market_regionid_date ON market_index_data (regionid, date);
+CREATE INDEX idx_sales_regionname ON sales_data (RegionName);
+CREATE INDEX idx_sales_salecount ON sales_data (Sale_count);
+
+
+Queries
+
+
+1.Monthly sales growth rate.
+
+WITH SalesWithPrevious AS (
+    SELECT 
+        sd1.RegionId,
+        sd1.Date,
+        sd1.Sale_count,
+        LAG(sd1.Sale_count) OVER (PARTITION BY sd1.RegionId ORDER BY sd1.Date) AS PrevMonthSales
+    FROM 
+        sales_data sd1
+)
+SELECT 
+    RegionId,
+    Date,
+    CASE
+        WHEN PrevMonthSales = 0 THEN 0
+        WHEN PrevMonthSales IS NULL THEN NULL
+        ELSE ROUND(((Sale_count - PrevMonthSales) / PrevMonthSales::numeric) * 100, 2)
+    END AS MonthlyGrowthRate
+FROM 
+    SalesWithPrevious
+ORDER BY 
+    RegionId, Date;
+
+
+2.Regions with Market Heat Index Favorable to Buyers and Higher than Average Sales
+
+SELECT 
+    sd.RegionName, 
+    AVG(sd.Sale_count) AS AvgMonthlySales, 
+    AVG(mi.Market_heat_Index) AS AvgMarketHeatIndex
+FROM 
+    sales_data sd
+JOIN 
+    market_index_data mi ON sd.RegionId = mi.RegionId AND sd.Date = mi.Date
+WHERE 
+    mi.Market_heat_Index < 100 -- Assuming less than 100 is favorable to buyers
+GROUP BY 
+    sd.RegionName
+HAVING 
+    AVG(sd.Sale_count) > (SELECT AVG(Sale_count) FROM sales_data)
+ORDER BY 
+    AvgMonthlySales DESC;
+
+3. Regions with Consistent Sales Growth
+
+WITH YearlySales AS (
+    SELECT 
+        RegionId,
+        EXTRACT(YEAR FROM Date) AS Year,  -- Extracting the year from Date column
+        SUM(Sale_count) AS TotalSales
+    FROM 
+        sales_data
+    GROUP BY 
+        RegionId, Year
+),
+SalesGrowth AS (
+    SELECT 
+        RegionId,
+        Year,
+        TotalSales,
+        LAG(TotalSales) OVER (PARTITION BY RegionId ORDER BY Year) AS PrevYearSales
+    FROM 
+        YearlySales
+),
+ConsistentGrowth AS (
+    SELECT 
+        RegionId,
+        Year,
+        TotalSales,
+        PrevYearSales,
+        (TotalSales - PrevYearSales) AS Growth,
+        -- Calculate the consecutive growth streak using the window function
+        COUNT(*) OVER (PARTITION BY RegionId ORDER BY Year ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS GrowthStreak
+    FROM 
+        SalesGrowth
+    WHERE 
+        PrevYearSales IS NOT NULL
+)
+-- Now, filter the result in the outer query
+SELECT 
+    RegionId,
+    Year,
+    TotalSales,
+    Growth
+FROM 
+    ConsistentGrowth
+WHERE 
+    Growth > 0
+    AND GrowthStreak = 3  -- Filter by GrowthStreak
+ORDER BY 
+    RegionId, Year;
+
+4.Forecasted ZHVI for November 2025 with Current ZHVI for October 2024
+
+WITH LatestZHVI AS (
+    SELECT 
+        regionid,
+        zhvi AS current_zhvi,
+        date
+    FROM 
+        zillow_home_index
+    WHERE 
+        date = '2024-10-31'  -- Assuming we are working with October 2024 data for current ZHVI
+),
+GrowthForecast AS (
+    SELECT 
+        regionid,
+        regionname,
+        yearforecast,
+        statename
+    FROM 
+        growth_data
+    WHERE 
+        basedate = '2024-10-31'  -- Using data based on October 2024
+        AND yearforecast IS NOT NULL  -- Only include regions with forecasted growth
+)
+SELECT 
+    g.regionid,
+    g.regionname,
+    g.statename,
+    z.current_zhvi,
+    g.yearforecast,
+    z.current_zhvi * (1 + (g.yearforecast / 100)) AS forecasted_zhvi  -- Calculating forecasted ZHVI for November 2025
+FROM 
+    GrowthForecast g
+JOIN 
+    LatestZHVI z ON g.regionid = z.regionid
+ORDER BY 
+    g.yearforecast DESC;
+
+
+5.Average Home Value Index by Market Heat Index Category
+
+SELECT 
+    CASE 
+        WHEN mi.Market_heat_Index >= 150 THEN 'High'
+        WHEN mi.Market_heat_Index >= 100 AND mi.Market_heat_Index < 150 THEN 'Medium'
+        ELSE 'Low'
+    END AS MarketHeatCategory,
+    AVG(zh.ZHVI) AS AvgHomeValueIndex
+FROM 
+    zillow_home_index zh
+JOIN 
+    market_index_data mi ON zh.RegionID = mi.RegionID AND zh.Date = mi.Date
+GROUP BY 
+    MarketHeatCategory
+ORDER BY 
+    MarketHeatCategory;
+
+6.Regions with Declining Growth but High Market Activity
+
+WITH GrowthData AS (
+    SELECT
+        gd.RegionID,
+        gd.RegionName,
+        gd.StateName,
+        gd.YearForecast,
+        zhvi.ZHVI AS CurrentZHVI
+    FROM
+        growth_data gd
+    JOIN
+        zillow_home_index zhvi ON gd.RegionID = zhvi.RegionID
+    WHERE
+        zhvi.Date = '2024-10-31'  -- Current ZHVI as of October 2024
+),
+DecliningGrowth AS (
+    SELECT
+        RegionID,
+        RegionName,
+        StateName,
+        YearForecast,
+        CurrentZHVI,
+        CASE
+            WHEN YearForecast < 0 THEN 'Declining'
+            ELSE 'Growing'
+        END AS GrowthStatus
+    FROM
+        GrowthData
+)
+SELECT
+    RegionID,
+    RegionName,
+    StateName,
+    CurrentZHVI,
+    YearForecast
+FROM
+    DecliningGrowth
+WHERE
+    GrowthStatus = 'Declining'  -- Focus on regions with negative forecasted growth
+    AND CurrentZHVI > (SELECT AVG(ZHVI) FROM zillow_home_index WHERE Date = '2024-10-31')  -- High market activity
+ORDER BY
+    CurrentZHVI DESC;
+
+7.Top 5 Regions with the Highest Cumulative ZHVI and Sales
+
+WITH CumulativeSales AS (
+    SELECT
+        sd.RegionId,
+        sd.RegionName,
+        SUM(sd.Sale_count) AS TotalSales
+    FROM
+        sales_data sd
+    GROUP BY
+        sd.RegionId, sd.RegionName
+),
+CumulativeZHVI AS (
+    SELECT
+        zhvi.RegionID,
+        zhvi.RegionName,
+        SUM(zhvi.ZHVI) AS TotalZHVI
+    FROM
+        zillow_home_index zhvi
+    WHERE
+        zhvi.Date BETWEEN '2018-01-01' AND '2024-12-31'  -- Calculate over a 6-year period
+    GROUP BY
+        zhvi.RegionID, zhvi.RegionName
+)
+SELECT
+    cs.RegionId,
+    cs.RegionName,
+    cs.TotalSales,
+    cz.TotalZHVI,
+    (cs.TotalSales + cz.TotalZHVI) AS TotalCombinedValue
+FROM
+    CumulativeSales cs
+JOIN
+    CumulativeZHVI cz ON cs.RegionId = cz.RegionID
+ORDER BY
+    TotalCombinedValue DESC
+LIMIT 5;
+
+

@@ -1,0 +1,45 @@
+CREATE TABLE growth_data (
+    regionid INT NOT NULL,
+    sizerank INT NOT NULL,
+    monthforecast NUMERIC(5, 2),
+    quarterforecast NUMERIC(5, 2),
+    yearforecast NUMERIC(5, 2),
+    basedate DATE NOT NULL,
+    regionname VARCHAR(255),
+    regiontype VARCHAR(255),
+    statename VARCHAR(255),
+    PRIMARY KEY (regionid, basedate)
+);
+
+CREATE TABLE market_index_data (
+    regionid INT NOT NULL,
+    sizerank INT NOT NULL,
+    date DATE NOT NULL,
+    market_heat_index NUMERIC(5, 2),
+    regiontype VARCHAR(255),
+    regionname VARCHAR(255),
+    statename VARCHAR(255),
+    PRIMARY KEY (regionid, date)
+);
+
+CREATE TABLE sales_data (
+    regionid INT NOT NULL,
+    sizerank INT NOT NULL,
+    date DATE NOT NULL,
+    sale_count INT,
+    regiontype VARCHAR(255),
+    regionname VARCHAR(255),
+    statename VARCHAR(255),
+    PRIMARY KEY (regionid, date)
+);
+
+CREATE TABLE zillow_home_index (
+    regionid INT NOT NULL,
+    sizerank INT NOT NULL,
+    date DATE NOT NULL,
+    zhvi NUMERIC(15, 2),
+    regiontype VARCHAR(255),
+    regionname VARCHAR(255),
+    statename VARCHAR(255),
+    PRIMARY KEY (regionid, date)
+);
