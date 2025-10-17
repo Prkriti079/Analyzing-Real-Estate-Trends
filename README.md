@@ -32,24 +32,26 @@ It demonstrates end-to-end database design — from **data cleaning and schema c
 
 ---
 
-## 🧩 SQL Scripts
+## SQL Scripts
 
 | File | Description |
 |------|--------------|
 | [`sql/DDL-Statements.txt`](sql/DDL-Statements.txt) | Database & Table creation scripts |
 | [`sql/DML-Statements.txt`](sql/DML-Statements.txt) | Analytical queries + indexes + forecast trend analysis |
 
-Example queries:
-```sql
--- Average Home Value by Region
-SELECT region_name, ROUND(AVG(home_value), 2) AS avg_home_value
-FROM sales
-GROUP BY region_name
-ORDER BY avg_home_value DESC;
+---
 
--- Year-over-Year Growth
-SELECT region_name,
-       (MAX(home_value) - MIN(home_value)) / MIN(home_value) * 100 AS yoy_growth
-FROM market_index
+## Datasets
+All datasets used in this project are available in the [`datasets/`](datasets/) directory.
 
-GROUP BY region_name;
+- **Source:** The raw housing data was obtained from the [Zillow Housing Dataset on Kaggle](https://www.kaggle.com/datasets/zillow/zecon) and other publicly available Zillow resources.  
+- **Description:** The dataset includes monthly home value indices, sales counts, market performance metrics, and forecast indicators for U.S. metro areas.  
+- **Usage:** Raw data was cleaned, normalized, and imported into a relational database for querying and trend analysis.  
+
+---
+
+#### Folder Structure
+- **`raw/`** → Original Zillow datasets downloaded for analysis.  
+- **`cleaned/`** → Processed, formatted, and normalized datasets ready for database import.  
+
+---
